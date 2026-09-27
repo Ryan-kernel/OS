@@ -7,7 +7,6 @@ typedef unsigned long  uint64_t;
 #define VGA_HEIGHT 25
 #define VGA_BUFFER 0xB8000
 
-/* ---------- 端口 IO ---------- */
 static inline void outb(uint16_t port, uint8_t val) {
     __asm__ volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
 }
@@ -18,7 +17,6 @@ static inline uint8_t inb(uint16_t port) {
     return ret;
 }
 
-/* ---------- VGA 光标 ---------- */
 static int get_cursor(void) {
     outb(0x3D4, 0x0E);
     int pos = (int)inb(0x3D5) << 8;
@@ -34,7 +32,6 @@ static void set_cursor(int pos) {
     outb(0x3D5, (uint8_t)(pos & 0xFF));
 }
 
-/* ---------- 清屏 ---------- */
 void clear_screen(void) {
     volatile char *vga = (volatile char *)VGA_BUFFER;
     for (int i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++) {
@@ -44,7 +41,6 @@ void clear_screen(void) {
     set_cursor(0);
 }
 
-/* ---------- 输出单字符 ---------- */
 void putchar(char c) {
     volatile char *vga = (volatile char *)VGA_BUFFER;
     int cursor = get_cursor();
@@ -65,7 +61,6 @@ void putchar(char c) {
         cursor++;
     }
 
-    /* 滚屏 */
     if (cursor >= VGA_WIDTH * VGA_HEIGHT) {
         for (int i = 0; i < (VGA_HEIGHT - 1) * VGA_WIDTH; i++) {
             vga[i * 2]     = vga[(i + VGA_WIDTH) * 2];
@@ -81,12 +76,10 @@ void putchar(char c) {
     set_cursor(cursor);
 }
 
-/* ---------- 输出字符串 ---------- */
 void print(const char *s) {
     while (*s) putchar(*s++);
 }
 
-/* ---------- 输出 16 进制 ---------- */
 void print_hex(uint64_t n) {
     char hex[17];
     hex[0]  = '0'; hex[1]  = '1'; hex[2]  = '2'; hex[3]  = '3';
@@ -101,23 +94,23 @@ void print_hex(uint64_t n) {
     }
 }
 
-/* ---------- 输出十进制 ---------- */
 void print_dec(int n) {
     if (n < 0) { putchar('-'); n = -n; }
     if (n >= 10) print_dec(n / 10);
     putchar('0' + (n % 10));
 }
 
-/* ---------- 外部函数 ---------- */
 extern void idt_init(void);
+extern void shell_init(void);
+extern void heap_init(void);
+extern void fs_init(void);
 
-/* ---------- 主函数 ---------- */
 void kernel_main(void) {
     clear_screen();
-    
     idt_init();
+    heap_init();
+    fs_init();
+    shell_init();
 
-    while (1) {
-        __asm__ volatile ("hlt");
-    }
+    while (1) __asm__ volatile ("hlt");
 }
