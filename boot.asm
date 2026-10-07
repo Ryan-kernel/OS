@@ -10,18 +10,21 @@ start:
     mov sp, 0x7c00
     sti
 
+    mov [0x7DFC], dl
+
     mov ah, 0x00
     mov al, 0x03
     int 0x10
-    
+
     mov ah, 0x02
-    mov al, 32
+    mov al, 8
     mov ch, 0
     mov cl, 2
     mov dh, 0
-    mov dl, 0x00
+    mov dl, [0x7DFC]
     mov bx, 0x7e00
     int 0x13
+
     jc disk_error
 
     jmp 0x0000:0x7e00
@@ -44,5 +47,7 @@ print_string:
 
 err_msg db "Disk error!", 0
 
+times 508-($-$$) db 0
+dw 0
 times 510-($-$$) db 0
 dw 0xaa55

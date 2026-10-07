@@ -7,6 +7,9 @@ static inline void outb(uint16_t port, uint8_t val) {
     __asm__ volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
 }
 
+extern uint32_t div_u32(uint32_t a, uint32_t b);
+extern uint32_t mod_u32(uint32_t a, uint32_t b);
+
 volatile uint64_t system_ticks = 0;
 
 void pit_init(void) {
@@ -23,4 +26,18 @@ void pit_handler(void) {
 
 uint64_t pit_seconds(void) {
     return system_ticks / 100;
+}
+
+void pit_get_time(int *hours, int *minutes, int *seconds) {
+    uint32_t total = (uint32_t)pit_seconds();
+    *hours   = (int)mod_u32(div_u32(total, 3600), 24);
+    *minutes = (int)mod_u32(div_u32(total, 60), 60);
+    *seconds = (int)mod_u32(total, 60);
+}
+
+void pit_sleep(uint32_t seconds) {
+    volatile uint64_t target = system_ticks + (uint64_t)seconds * 100;
+    while (system_ticks < target) {
+        __asm__ volatile ("hlt");
+    }
 }

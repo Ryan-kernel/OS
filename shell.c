@@ -8,24 +8,29 @@ typedef unsigned long  uint64_t;
 
 extern void putchar(char c);
 extern void print(const char *s);
-extern void print_hex(uint64_t n);
-extern void print_dec(int n);
+extern void kprintf(const char *fmt, ...);
 extern void clear_screen(void);
 extern uint64_t pit_seconds(void);
+extern void pit_get_time(int *hours, int *minutes, int *seconds);
+extern void pit_sleep(uint32_t seconds);
+
+extern uint32_t div_u32(uint32_t a, uint32_t b);
+extern uint32_t mod_u32(uint32_t a, uint32_t b);
 
 extern void reboot_now(void);
+extern void shutdown_now(void);
 extern void print_cpu_info(void);
 extern char __bss_start;
 extern char __bss_end;
 extern void heap_info(void);
 extern void *kmalloc(uint64_t size);
 extern void kfree(void *ptr);
-
 extern void fs_ls(void);
 extern void fs_touch(const char *name);
 extern void fs_write(const char *name, const char *text);
 extern void fs_cat(const char *name);
 extern void fs_rm(const char *name);
+extern void fs_mv(const char *old_name, const char *new_name);
 
 static char input_buf[BUF_SIZE];
 static int  input_len = 0;
@@ -74,10 +79,16 @@ static void execute(const char *cmd) {
         print("  help         - show this\n");
         print("  clear        - clear screen\n");
         print("  echo X       - print X\n");
-        print("  time         - show uptime\n");
+        print("  time         - show uptime in seconds\n");
+        print("  uptime       - show uptime\n");
+        print("  date         - show current time\n");
+        print("  sleep N      - sleep N seconds\n");
         print("  about        - about this OS\n");
         print("  hist         - show history\n");
         print("  reboot       - reboot the machine\n");
+        print("  shutdown     - power off\n");
+        print("  poweroff     - alias for shutdown\n");
+        print("  exit         - alias for shutdown\n");
         print("  mem          - show memory info\n");
         print("  cpu          - show CPU info\n");
         print("  heap         - show heap info\n");
@@ -88,39 +99,63 @@ static void execute(const char *cmd) {
         print("  write N TEXT - write text to file\n");
         print("  cat NAME     - show file contents\n");
         print("  rm NAME      - remove file\n");
+        print("  mv OLD NEW   - rename file\n");
     } else if (str_eq(cmd, "clear")) {
         clear_screen();
-    } else if (str_starts(cmd, "echo ")) {
-        print(cmd + 5);
+    } else if (str_eq(cmd, "echo")) {
         putchar('\n');
+    } else if (str_starts(cmd, "echo ")) {
+        kprintf("%s\n", cmd + 5);
     } else if (str_eq(cmd, "time")) {
-        print("Uptime: ");
-        print_dec((int)pit_seconds());
-        print(" seconds\n");
+        kprintf("Uptime: %u seconds\n", (unsigned int)pit_seconds());
+    } else if (str_eq(cmd, "uptime")) {
+        uint32_t sec = (uint32_t)pit_seconds();
+        uint32_t h = div_u32(sec, 3600);
+        uint32_t m = mod_u32(div_u32(sec, 60), 60);
+        uint32_t s = mod_u32(sec, 60);
+        kprintf("Uptime: %uh %um %us\n", h, m, s);
+    } else if (str_eq(cmd, "date")) {
+        int h, m, s;
+        pit_get_time(&h, &m, &s);
+        kprintf("Time: ");
+        if (h < 10) putchar('0');
+        kprintf("%d:", h);
+        if (m < 10) putchar('0');
+        kprintf("%d:", m);
+        if (s < 10) putchar('0');
+        kprintf("%d\n", s);
+    } else if (str_starts(cmd, "sleep ")) {
+        const char *p = cmd + 6;
+        uint32_t n = 0;
+        while (*p >= '0' && *p <= '9') {
+            n = n * 10 + (uint32_t)(*p - '0');
+            p++;
+        }
+        if (n == 0) {
+            kprintf("Usage: sleep N\n");
+        } else {
+            kprintf("Sleeping %u seconds...\n", n);
+            pit_sleep(n);
+            kprintf("Done.\n");
+        }
     } else if (str_eq(cmd, "about")) {
-        print("OS 64-bit\n");
-        print("made with Ryan\n");
+        kprintf("OS 64-bit\n");
+        kprintf("made with Ryan\n");
     } else if (str_eq(cmd, "hist")) {
         for (int i = 0; i < hist_count; i++) {
-            print(history[i]);
-            putchar('\n');
+            kprintf("%s\n", history[i]);
         }
     } else if (str_eq(cmd, "reboot")) {
-        print("Rebooting...\n");
+        kprintf("Rebooting...\n");
         reboot_now();
+    } else if (str_eq(cmd, "shutdown") || str_eq(cmd, "poweroff") || str_eq(cmd, "exit")) {
+        kprintf("Shutting down...\n");
+        shutdown_now();
     } else if (str_eq(cmd, "mem")) {
-        print("Kernel loaded at: ");
-        print_hex(0x8000);
-        putchar('\n');
-        print("BSS start: ");
-        print_hex((uint64_t)&__bss_start);
-        putchar('\n');
-        print("BSS end:   ");
-        print_hex((uint64_t)&__bss_end);
-        putchar('\n');
-        print("Ticks: ");
-        print_dec((int)pit_seconds());
-        putchar('\n');
+        kprintf("Kernel loaded at: %p\n", (void*)0x10000);
+        kprintf("BSS start: %p\n", (void*)&__bss_start);
+        kprintf("BSS end:   %p\n", (void*)&__bss_end);
+        kprintf("Ticks: %u\n", (unsigned int)pit_seconds());
     } else if (str_eq(cmd, "cpu")) {
         print_cpu_info();
     } else if (str_eq(cmd, "heap")) {
@@ -133,17 +168,14 @@ static void execute(const char *cmd) {
             p++;
         }
         if (n == 0) {
-            print("Usage: alloc N\n");
+            kprintf("Usage: alloc N\n");
         } else {
             void *ptr = kmalloc(n);
             if (ptr) {
-                print("Allocated ");
-                print_dec((int)n);
-                print(" bytes at ");
-                print_hex((uint64_t)ptr);
-                putchar('\n');
+                kprintf("Allocated %u bytes at %p\n",
+                        (unsigned int)n, ptr);
             } else {
-                print("Out of heap memory\n");
+                kprintf("Out of heap memory\n");
             }
         }
     } else if (str_starts(cmd, "free ")) {
@@ -161,12 +193,10 @@ static void execute(const char *cmd) {
             }
         }
         if (addr == 0) {
-            print("Usage: free 0xADDR\n");
+            kprintf("Usage: free 0xADDR\n");
         } else {
             kfree((void *)addr);
-            print("Freed 0x");
-            print_hex(addr);
-            putchar('\n');
+            kprintf("Freed %p\n", (void*)addr);
         }
     } else if (str_eq(cmd, "ls")) {
         fs_ls();
@@ -191,12 +221,38 @@ static void execute(const char *cmd) {
             p++;
             fs_write(name, p);
         } else {
-            print("Usage: write name text\n");
+            kprintf("Usage: write name text\n");
+        }
+    } else if (str_starts(cmd, "mv ")) {
+        char old_name[32];
+        char new_name[32];
+        const char *p = cmd + 3;
+        int n = 0;
+
+        while (*p && *p != ' ' && n < 31) {
+            old_name[n] = *p;
+            n++;
+            p++;
+        }
+        old_name[n] = 0;
+
+        while (*p == ' ') p++;
+
+        n = 0;
+        while (*p && n < 31) {
+            new_name[n] = *p;
+            n++;
+            p++;
+        }
+        new_name[n] = 0;
+
+        if (old_name[0] == 0 || new_name[0] == 0) {
+            kprintf("Usage: mv OLD NEW\n");
+        } else {
+            fs_mv(old_name, new_name);
         }
     } else {
-        print("Unknown command: ");
-        print(cmd);
-        putchar('\n');
+        kprintf("Unknown command: %s\n", cmd);
     }
 }
 

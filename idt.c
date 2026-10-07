@@ -28,8 +28,6 @@ extern uint64_t isr_stub_table[];
 
 extern void putchar(char c);
 extern void print(const char *s);
-extern void print_hex(uint64_t n);
-extern void print_dec(int n);
 
 extern void shell_input(char c);
 extern void shell_enter(void);
@@ -39,9 +37,9 @@ extern void pit_init(void);
 
 static void idt_set_gate(int n, uint64_t handler) {
     idt_table[n].offset_low  = (uint16_t)(handler & 0xFFFF);
-    idt_table[n].selector    = 0x18;
+    idt_table[n].selector    = 0x18;         /* 64 位代码段选择子 */
     idt_table[n].ist         = 0;
-    idt_table[n].type_attr   = 0x8E;
+    idt_table[n].type_attr   = 0x8E;         /* P=1, DPL=0, 64 位中断门 */
     idt_table[n].offset_mid  = (uint16_t)((handler >> 16) & 0xFFFF);
     idt_table[n].offset_high = (uint32_t)((handler >> 32) & 0xFFFFFFFF);
     idt_table[n].reserved    = 0;
@@ -60,13 +58,13 @@ static inline uint8_t inb(uint16_t port) {
 static void pic_remap(void) {
     outb(0x20, 0x11);
     outb(0xA0, 0x11);
-    outb(0x21, 0x20);
-    outb(0xA1, 0x28);
-    outb(0x21, 0x04);
+    outb(0x21, 0x20);   /* 主 PIC 偏移 0x20 */
+    outb(0xA1, 0x28);   /* 从 PIC 偏移 0x28 */
+    outb(0x21, 0x04);   /* 主 PIC IRQ2 接从 PIC */
     outb(0xA1, 0x02);
     outb(0x21, 0x01);
     outb(0xA1, 0x01);
-    outb(0x21, 0xFC);   /* 开 IRQ0（定时器）和 IRQ1（键盘） */
+    outb(0x21, 0xFC);   /* 打开 IRQ0、IRQ1 */
     outb(0xA1, 0xFF);
 }
 
@@ -82,7 +80,7 @@ static int extended     = 0;
 
 static int shift_down(void) { return shift_left || shift_right; }
 
-static const char scancode_lower[] = {
+static const char __attribute__((section(".rodata"))) scancode_lower[] = {
     0,  0, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',
     '\t','q','w','e','r','t','y','u','i','o','p','[',']','\n',
     0,  'a','s','d','f','g','h','j','k','l',';','\'','`',
@@ -94,7 +92,7 @@ static const char scancode_lower[] = {
     0
 };
 
-static const char scancode_upper[] = {
+static const char __attribute__((section(".rodata"))) scancode_upper[] = {
     0,  0, '!','@','#','$','%','^','&','*','(',')','_','+', '\b',
     '\t','Q','W','E','R','T','Y','U','I','O','P','{','}','\n',
     0,  'A','S','D','F','G','H','J','K','L',':','"','~',
@@ -191,6 +189,8 @@ void keyboard_handler(void) {
 }
 
 void idt_init(void) {
+    __asm__ volatile ("cli");
+
     for (int i = 0; i < 256; i++) {
         idt_table[i].offset_low  = 0;
         idt_table[i].selector    = 0;

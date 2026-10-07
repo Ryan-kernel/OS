@@ -2,21 +2,21 @@ ENTRY(_start)
 
 SECTIONS
 {
-    . = 0x8000;
+    . = 0x10000;
 
-    .text : {
+    .text ALIGN(16) : {
         *(.text)
     }
 
-    .rodata : {
+    .rodata ALIGN(16) : {
         *(.rodata)
     }
 
-    .data : {
+    .data ALIGN(16) : {
         *(.data)
     }
 
-    .bss : {
+    .bss ALIGN(16) : {
         __bss_start = .;
         *(.bss)
         *(COMMON)
@@ -24,6 +24,7 @@ SECTIONS
     }
 
     /DISCARD/ : {
+        *(.reloc)
         *(.eh_frame)
         *(.comment)
     }

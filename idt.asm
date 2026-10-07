@@ -11,8 +11,6 @@ idt_load:
     ret
 
 keyboard_handler_stub:
-    cli
-
     push rax
     push rcx
     push rdx
@@ -22,9 +20,9 @@ keyboard_handler_stub:
     push r9
     push r10
     push r11
-    
+
     call keyboard_handler
-    
+
     pop r11
     pop r10
     pop r9
@@ -35,8 +33,6 @@ keyboard_handler_stub:
     pop rcx
     pop rax
     iretq
-
-    sti
 
 section .data
 align 16

@@ -3,10 +3,7 @@ typedef unsigned short uint16_t;
 typedef unsigned int   uint32_t;
 typedef unsigned long  uint64_t;
 
-extern void putchar(char c);
-extern void print(const char *s);
-extern void print_hex(uint64_t n);
-extern void print_dec(int n);
+extern void kprintf(const char *fmt, ...);
 
 static const char *exception_names[] = {
     "Divide by Zero",
@@ -35,33 +32,17 @@ static const char *exception_names[] = {
 };
 
 void isr_handler(uint64_t int_no, uint64_t err_code, uint64_t *rsp) {
-    putchar('\n');
-    print("Exception: ");
-    if (int_no < 32) {
-        print(exception_names[int_no]);
-    } else {
-        print("Unknown");
-    }
-    putchar('\n');
+    kprintf("\n*** EXCEPTION #%d: %s ***\n",
+            (int)int_no,
+            int_no < 32 ? exception_names[int_no] : "Unknown");
 
-    print("  Error code: ");
-    print_hex(err_code);
-    putchar('\n');
-    
-    print("  RIP: ");
-    print_hex(rsp[0]);
-    putchar('\n');
+    kprintf("  Error code: %p\n", (void*)err_code);
+    kprintf("  RIP:        %p\n", (void*)rsp[0]);
+    kprintf("  CS:         %p\n", (void*)rsp[1]);
+    kprintf("  RFLAGS:     %p\n", (void*)rsp[2]);
 
-    print("  CS:  ");
-    print_hex(rsp[1]);
-    putchar('\n');
-
-    print("  RFLAGS: ");
-    print_hex(rsp[2]);
-    putchar('\n');
-
-    print("System halted.\n");
+    kprintf("System halted.\n");
     while (1) {
-        __asm__ volatile ("hlt");
+        __asm__ volatile ("cli; hlt");
     }
 }

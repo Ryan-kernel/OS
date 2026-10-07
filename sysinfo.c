@@ -3,37 +3,47 @@ typedef unsigned short uint16_t;
 typedef unsigned int   uint32_t;
 typedef unsigned long  uint64_t;
 
-extern void putchar(char c);
-extern void print(const char *s);
-extern void print_dec(int n);
+extern void kprintf(const char *fmt, ...);
+
+/* ---- 端口 I/O ---- */
+static inline void outb(uint16_t port, uint8_t val) {
+    __asm__ volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
+}
+
+static inline uint8_t inb(uint16_t port) {
+    uint8_t ret;
+    __asm__ volatile ("inb %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
 
 /* ---- 重启 ---- */
 void reboot_now(void) {
     while (1) {
-        uint8_t status;
-        __asm__ volatile ("inb $0x64, %0" : "=a"(status));
+        uint8_t status = inb(0x64);
         if (!(status & 0x02)) break;
     }
-    __asm__ volatile ("outb %0, $0x64" : : "a"((uint8_t)0xFE));
+    outb(0x64, 0xFE);
     while (1) {
-        __asm__ volatile ("hlt");
+        __asm__ volatile ("cli; hlt");
     }
 }
 
-/* ---- CUP信息 ---- */
+/* ---- 关机（isa-debug-exit） ---- */
+void shutdown_now(void) {
+    outb(0xF4, 0x00);
+
+    kprintf("isa-debug-exit not present, rebooting instead...\n");
+    reboot_now();
+}
+
+/* ---- CPU 信息 ---- */
 void print_cpu_info(void) {
     uint32_t eax, ebx, ecx, edx;
 
-    /* ---- leaf 0：厂商字符串 ---- */
     __asm__ volatile (
-        "pushq %%rbx\n\t"
-        "movl $0, %%eax\n\t"
-        "cpuid\n\t"
-        "movl %%ebx, %%esi\n\t"
-        "popq %%rbx"
-        : "=a"(eax), "=S"(ebx), "=c"(ecx), "=d"(edx)
-        :
-        : "memory"
+        "cpuid"
+        : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
+        : "a"(0)
     );
 
     char vendor[13];
@@ -51,26 +61,16 @@ void print_cpu_info(void) {
     vendor[11] = (char)((ecx >> 24) & 0xFF);
     vendor[12] = 0;
 
-    print("Vendor: ");
-    print(vendor);
-    putchar('\n');
+    kprintf("Vendor: %s\n", vendor);
 
     __asm__ volatile (
-        "pushq %%rbx\n\t"
-        "movl $1, %%eax\n\t"
-        "cpuid\n\t"
-        "movl %%ebx, %%esi\n\t"
-        "popq %%rbx"
-        : "=a"(eax), "=S"(ebx), "=c"(ecx), "=d"(edx)
-        :
-        : "memory"
+        "cpuid"
+        : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
+        : "a"(1)
     );
 
-    print("Family: ");
-    print_dec((int)((eax >> 8) & 0xF));
-    print("  Model: ");
-    print_dec((int)((eax >> 4) & 0xF));
-    print("  Stepping: ");
-    print_dec((int)(eax & 0xF));
-    putchar('\n');
+    kprintf("Family: %d  Model: %d  Stepping: %d\n",
+            (int)((eax >> 8) & 0xF),
+            (int)((eax >> 4) & 0xF),
+            (int)(eax & 0xF));
 }

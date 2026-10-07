@@ -21,14 +21,16 @@ set CFLAGS=-m64 -c -nostdlib -ffreestanding -fno-pic -fno-stack-protector -mno-r
 %CC% %CFLAGS% -o sysinfo.o sysinfo.c
 %CC% %CFLAGS% -o kmalloc.o kmalloc.c
 %CC% %CFLAGS% -o fs.o fs.c
+%CC% %CFLAGS% -o kprintf.o kprintf.c
 
-%LD% -T linker.ld -o kernel.elf kernel_entry.o idt_asm.o isr_asm.o pit_asm.o kernel.o idt.o isr.o shell.o pit.o sysinfo.o kmalloc.o fs.o
+%LD% -T linker.ld -o kernel.elf kernel_entry.o idt_asm.o isr_asm.o pit_asm.o kernel.o idt.o isr.o shell.o pit.o sysinfo.o kmalloc.o fs.o kprintf.o
 
-%OBJCOPY% -O binary --only-section=.text --only-section=.rodata --only-section=.data kernel.elf kernel.bin
+%OBJCOPY% -O binary kernel.elf kernel.bin
 
 dd if=/dev/zero of=os.img bs=512 count=2880
 dd if=boot.bin   of=os.img bs=512 seek=0 conv=notrunc
 dd if=stage2.bin of=os.img bs=512 seek=1 conv=notrunc
-dd if=kernel.bin of=os.img bs=512 seek=2 conv=notrunc
+dd if=kernel.bin of=os.img bs=512 seek=9 conv=notrunc
 
 echo Build done.
+"D:\qemu\qemu-system-x86_64" -fda os.img -device isa-debug-exit,iobase=0xf4,iosize=0x04

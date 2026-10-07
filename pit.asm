@@ -4,7 +4,6 @@ global pit_handler_stub
 extern pit_handler
 
 pit_handler_stub:
-    cli
     push rax
     push rcx
     push rdx
@@ -26,5 +25,4 @@ pit_handler_stub:
     pop rdx
     pop rcx
     pop rax
-    sti
     iretq

@@ -65,13 +65,13 @@ isr_common:
     push r13
     push r14
     push r15
-    
-    mov rdi, [rsp + 15*8 + 8]
-    mov rsi, [rsp + 15*8]
+
+    mov rdi, [rsp + 15*8]
+    mov rsi, [rsp + 15*8 + 8]
     lea rdx, [rsp + 15*8 + 16]
-    
+
     call isr_handler
-    
+
     pop r15
     pop r14
     pop r13
@@ -87,7 +87,7 @@ isr_common:
     pop rdx
     pop rcx
     pop rax
-    
+
     add rsp, 16
     iretq
 
