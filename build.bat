@@ -32,5 +32,9 @@ dd if=boot.bin   of=os.img bs=512 seek=0 conv=notrunc
 dd if=stage2.bin of=os.img bs=512 seek=1 conv=notrunc
 dd if=kernel.bin of=os.img bs=512 seek=9 conv=notrunc
 
+if not exist disk.img (
+    dd if=/dev/zero of=disk.img bs=512 count=2048
+)
+
 echo Build done.
-"D:\qemu\qemu-system-x86_64" -fda os.img -device isa-debug-exit,iobase=0xf4,iosize=0x04
+"D:\qemu\qemu-system-x86_64" -fda os.img -hda disk.img -device isa-debug-exit,iobase=0xf4,iosize=0x04
