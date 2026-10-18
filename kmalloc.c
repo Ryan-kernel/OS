@@ -6,7 +6,7 @@ typedef unsigned long  uint64_t;
 extern void kprintf(const char *fmt, ...);
 
 #define HEAP_START  0x200000ULL
-#define HEAP_END    0x400000ULL
+#define HEAP_END    0x1000000ULL
 #define ALIGN8(x)   (((x) + 7) & ~7ULL)
 #define BLOCK_HEADER  sizeof(struct free_block)
 
